@@ -4,8 +4,8 @@
 - **Status:** Research. Every proposal here is a **recommendation, not a decision**. Nothing in this document is a confirmed requirement or ADR.
 - **Owner directive that drives this report:** "If we promise DSD/DoP and bit-perfect, it must be verified by software at least, not only theoretical, until we can measure it."
 - **Scope:** every **Confirmed** or **Draft** requirement under `public/*/docs/requirements/` and `public/*/*/docs/requirements/`, plus the accepted ADRs and specs (`t1/docs/specs/faceplate-interface.md`, `toolkit/hardware/docs/specs/component-export.md`). Withdrawn and Moved requirements are ignored.
-- **Constraints taken as given:** no CI, everything runs locally; UNIX/POSIX only, tested on macOS (TK-010, TK-011); agentic-first CLI (TK-009, conventions in [`2026-10-agentic-cli-design.md`](https://github.com/opendap-project/toolkit-cli/blob/main/docs/research/2026-10-agentic-cli-design.md) §8); the virtual T1 in `opendap-os/build` (QEMU 11.1.2 `virt` + HVF, 480 × 800 virtio-gpu, virtio-multitouch, virtio-keyboard buttons, virtio-sound, QMP via `build/dap-qmp.py`, SSH on 2222).
-- **Evidence convention:** a fact with a link was read from that primary source in this session (2026-10-21/22). **UNVERIFIED** marks anything not confirmed against a primary source. Tool versions already checked by the sibling reports ([hardware gap analysis](https://github.com/opendap-project/toolkit-hardware/blob/main/docs/research/2026-10-hardware-toolchain-gap-analysis.md), [co-design workflow](https://github.com/opendap-project/toolkit-hardware/blob/main/docs/research/2026-10-co-design-workflow.md), [software/firmware toolchain](https://github.com/opendap-project/toolkit-host/blob/main/docs/research/2026-10-software-firmware-toolchain.md), compliance, [`opendap-os` image composition](https://github.com/opendap-project/opendap-os/blob/main/docs/research/2026-10-image-composition.md), [`opendap-os` OS lifecycle](https://github.com/opendap-project/opendap-os/blob/main/docs/research/2026-10-os-lifecycle.md)) are reused and cited to those reports rather than re-checked.
+- **Constraints taken as given:** no CI, everything runs locally; UNIX/POSIX only, tested on macOS (TK-010, TK-011); agentic-first CLI (TK-009, conventions in [`2026-10-agentic-cli-design.md`](https://github.com/opendap-project/toolkit-cli/blob/main/docs/research/2026-10-agentic-cli-design.md) §8); the virtual T1 in `blackbird-os/build` (QEMU 11.1.2 `virt` + HVF, 480 × 800 virtio-gpu, virtio-multitouch, virtio-keyboard buttons, virtio-sound, QMP via `build/dap-qmp.py`, SSH on 2222).
+- **Evidence convention:** a fact with a link was read from that primary source in this session (2026-10-21/22). **UNVERIFIED** marks anything not confirmed against a primary source. Tool versions already checked by the sibling reports ([hardware gap analysis](https://github.com/opendap-project/toolkit-hardware/blob/main/docs/research/2026-10-hardware-toolchain-gap-analysis.md), [co-design workflow](https://github.com/opendap-project/toolkit-hardware/blob/main/docs/research/2026-10-co-design-workflow.md), [software/firmware toolchain](https://github.com/opendap-project/toolkit-host/blob/main/docs/research/2026-10-software-firmware-toolchain.md), compliance, [`blackbird-os` image composition](https://github.com/opendap-project/blackbird-os/blob/main/docs/research/2026-10-image-composition.md), [`blackbird-os` OS lifecycle](https://github.com/opendap-project/blackbird-os/blob/main/docs/research/2026-10-os-lifecycle.md)) are reused and cited to those reports rather than re-checked.
 
 ---
 
@@ -18,7 +18,7 @@
 5. **DoP and DSF have exact, testable bit layouts from primary sources.** DoP v1.1: 8-bit marker in the MSBs alternating **0x05 / 0xFA** per sample, same marker on every channel of a frame, 16 DSD bits below it with the oldest bit first, PCM rate 176.4 kHz for DSD64 and 352.8 kHz for DSD128 ([DoP open standard v1.1](https://dsd-guide.com/sites/default/files/white-papers/DoP_openStandard_1v1.pdf)). DSF stores 1-bit data **LSB first**, in **4096-byte blocks per channel**, and zero-fills the unused part of the last block ([Sony DSF spec](https://dsd-guide.com/sites/default/files/white-papers/DSFFileFormatSpec_E.pdf)). ALSA's DSD silence byte is **0x69** ([`sound/core/pcm_misc.c`](https://raw.githubusercontent.com/torvalds/linux/master/sound/core/pcm_misc.c)). A validator must handle all three: bit reversal, block de-interleaving and the zero padding, which is *not* DSD silence.
 6. **Faceplate HID commands can be verified end-to-end in the virtual T1 through UHID.** `/dev/uhid` creates kernel HID devices from userspace; `struct uhid_create2_req` carries `bus`, `vendor`, `product`, `version` and the report descriptor ([`include/uapi/linux/uhid.h`](https://raw.githubusercontent.com/torvalds/linux/master/include/uapi/linux/uhid.h), [UHID docs](https://www.kernel.org/doc/html/latest/hid/uhid.html)). Feeding the core-set descriptor through it checks the spec's "usage → Linux event" table against the real kernel of the image. It does **not** exercise the `i2c-hid` transport, which needs a host-side protocol test now and a logic analyser later.
 7. **No usable RP2350 emulator was found.** Renode 1.17.0 release notes do not mention RP2040/RP2350 ([Renode releases](https://github.com/renode/renode/releases)); `rp2040js` is RP2040-only ([GitHub](https://github.com/wokwi/rp2040js)). **Recommendation:** a real Raspberry Pi Pico 2 on the dev host is the stand-in for BRD-015/OS-008 now, driven by `picotool` (RP2350 support, `load`, `verify`, partition tables, per its [README](https://raw.githubusercontent.com/raspberrypi/picotool/master/README.md)) and by a second Pico running `debugprobe` as a CMSIS-DAP SWD probe ([GitHub](https://github.com/raspberrypi/debugprobe)).
-8. **Battery emulation in the VM has a kernel gap.** `test_power` has runtime-writable parameters for capacity, voltage, current, status and charge counter ([`test_power.c`](https://raw.githubusercontent.com/torvalds/linux/master/drivers/power/supply/test_power.c)), but the Debian kernel does not build it (recorded in `opendap-os` requirements context). Userspace cannot create `power_supply` devices, so **battery logic must be testable behind an injectable source** (a sysfs-root fixture or a bus-level fake), and the real fuel gauge is verified only on hardware.
+8. **Battery emulation in the VM has a kernel gap.** `test_power` has runtime-writable parameters for capacity, voltage, current, status and charge counter ([`test_power.c`](https://raw.githubusercontent.com/torvalds/linux/master/drivers/power/supply/test_power.c)), but the Debian kernel does not build it (recorded in `blackbird-os` requirements context). Userspace cannot create `power_supply` devices, so **battery logic must be testable behind an injectable source** (a sysfs-root fixture or a bus-level fake), and the real fuel gauge is verified only on hardware.
 9. **A/B rollback can be tested in QEMU with the same U-Boot logic as the device.** U-Boot's `qemu_arm64_defconfig` boots the `virt` machine with `-bios u-boot.bin` and can keep its environment in a pflash image ([U-Boot QEMU docs](https://docs.u-boot.org/en/latest/board/emulation/qemu-arm.html)); the lifecycle research already proposes this "fidelity path" with `bootmeth_rauc`. The current virtual T1 boots EDK2, so this path is still to be built.
 10. **Several promises can be verified *statically* now and nobody does it yet:** mainline-driver availability for every chosen part (BRD-001, OS-002, FPT-018) by checking `modules.alias`/`modules.builtin` of the pinned Debian kernel package; the privacy-LED wiring rule (BRD-027) on the netlist; the footprint (T1-013) and coordinate convention (T1-021) on exported STEP files; kernel ≥ 7 (OS-001) from the image manifest.
 11. **Design-for-test decisions are due now, before the board is drawn** (§9): test pads on MCLK/BCLK/LRCK/SDATA, sense resistors or shunt points on the battery and main rails, exposed SWD for the RP2350, the faceplate I2C/INT lines, and the HAT lanes' launch geometry suited to probing. Without them, several promises can never be measured on the T1 itself.
@@ -28,7 +28,7 @@
 
 ## 1. Method
 
-1. Read every requirement README listed in the scope (board, t1, case, hat-standard, opendap-os, system, toolkit, kicad-lib, ui-components, blender-lib, freecad-lib, faceplates/{touch,classic,cassette}, hats/{camera,nas,oscilloscope,powerbank,radio,recorder,vna}), every ADR (`board` 0001–0004, `t1` 0001–0002, `case` 0001–0003, `hat-standard` 0001, `opendap-os` 0001–0005, `system` 0001) and the two specs.
+1. Read every requirement README listed in the scope (board, t1, case, hat-standard, blackbird-os, system, toolkit, kicad-lib, ui-components, blender-lib, freecad-lib, faceplates/{touch,classic,cassette}, hats/{camera,nas,oscilloscope,powerbank,radio,recorder,vna}), every ADR (`board` 0001–0004, `t1` 0001–0002, `case` 0001–0003, `hat-standard` 0001, `blackbird-os` 0001–0005, `system` 0001) and the two specs.
 2. Kept only Confirmed and Draft rows. Grouped them into **24 verifiable promises** (§2).
 3. For each promise: defined pass criteria, a software verification now, a hardware measurement later, and the tools (existing vs to build).
 4. Checked the load-bearing facts (driver format tables, DoP/DSF layouts, UHID, QMP, test_power, U-Boot QEMU, RAUC, instruments) against primary sources.
@@ -40,7 +40,7 @@
 |---|---|---|---|
 | **L0** | Static | Files only: specs, YAML, KiCad netlists, STEP, DT, image manifest, kernel package | Consistency, presence, rules (e.g. a driver exists, a net is wired as required) |
 | **L1** | Model / simulation | ngspice, openEMS/Palace + scikit-rf, FreeCAD FEM/CalculiX, Python models | Physics estimates against a budget; ranks design variants |
-| **L2** | Virtual T1 | QEMU `virt` + OpenDAP OS image, QMP, SSH, `snd-aloop`, UHID, throttled block devices | Software behaviour exactly as shipped, at the kernel/userspace boundary |
+| **L2** | Virtual T1 | QEMU `virt` + Blackbird OS image, QMP, SSH, `snd-aloop`, UHID, throttled block devices | Software behaviour exactly as shipped, at the kernel/userspace boundary |
 | **L3** | Dev-kit hardware | An RK3566 SBC with mainline support, eval boards (DAC, fuel gauge, Wi-Fi module), a Pico 2 | Real drivers, real clocks, real power on the same SoC |
 | **L4** | T1 prototype | EVT/DVT boards in the case, with faceplate and HATs | The product promise itself |
 | **L5** | Accredited lab | EMC, safety, IP, hearing safety | Certification evidence |
@@ -62,11 +62,11 @@
 | P7 | Battery life and power management | T1-009, T1-012, BRD-008, BRD-009, BRD-020 (Draft) |
 | P8 | Protection and monitoring | BRD-007, BRD-010, BRD-026 (Draft), HCS-015 (Draft) |
 | P9 | Mainline drivers, no custom kernel, kernel ≥ 7, prebuilt kernel updates | BRD-001, OS-001, OS-002, OS-006, OS-007 (Draft), FPT-008 (Draft), FPT-018, BRD-025 (Draft) |
-| P10 | Image: built from code, trimmed, signed, versioned, simple flashing | OS-004, OS-005, OS-010, OS-011, OS-012, OS-021, ADR opendap-os 0004/0005 |
+| P10 | Image: built from code, trimmed, signed, versioned, simple flashing | OS-004, OS-005, OS-010, OS-011, OS-012, OS-021, ADR blackbird-os 0004/0005 |
 | P11 | Updates, OTA, A/B rollback, recovery | OS-013, OS-014 (Draft), OS-017 (Draft), BRD-016, BRD-017, BRD-018, BRD-035, BRD-039 |
 | P12 | Boot without RP firmware; boot time (implicit in product quality, no numeric requirement) | BRD-019 |
 | P13 | Virtual T1 fidelity and remote control | OS-009, OS-016, OS-018, OS-019 |
-| P14 | Peripheral hosting: OpenDAP OS flashes, operates and debugs every chip | OS-008, OS-015, BRD-004, BRD-005, BRD-014, BRD-015, HCS-013, ADR board-0004 |
+| P14 | Peripheral hosting: Blackbird OS flashes, operates and debugs every chip | OS-008, OS-015, BRD-004, BRD-005, BRD-014, BRD-015, HCS-013, ADR board-0004 |
 | P15 | Faceplate controls as standardized HID commands; identification | T1-018, T1-020, T1-023, T1-024, FPK-009, FPC-009, ADR t1-0002 |
 | P16 | Display, touch, status LED, ALS, microphones, IMU, buttons | FPT-002, FPT-003, FPT-004, FPT-010 (Draft), FPT-013, FPT-014, FPT-015, FPT-016, FPT-017, FPK-004…008, FPC-004…008, BRD-027 (Draft), BRD-031, BRD-032, BRD-036, T1-014, T1-015, T1-022 |
 | P17 | HAT interface: direct high-speed lanes, maximum speed, one interconnect type | HCS-004, HCS-005, HCS-006, HCS-014 (Draft), BRD-006, BRD-013, BRD-033, ADR hat-standard-0001, ADR board-0002 |
@@ -103,7 +103,7 @@ For one **test vector** played by the first-party engine on one **output path**:
 ### 3.2 The software verification chain in the virtual T1 (L2, now)
 
 ```text
-                                                    virtual T1 (OpenDAP OS guest)
+                                                    virtual T1 (Blackbird OS guest)
  host (macOS)                    ┌───────────────────────────────────────────────────────────────┐
  opendap verification check      │  test vector files ──► playback engine ──► hw:Loopback,0,N     │
    audio.bitperfect ──SSH──────► │   (FLAC/WAV/ALAC/DSF/DFF)    (exclusive ALSA)       │ snd-aloop │
@@ -116,7 +116,7 @@ For one **test vector** played by the first-party engine on one **output path**:
 
 Steps:
 
-1. **Load the loopback** with enough substreams: `modprobe snd-aloop pcm_substreams=2` (module parameter name per `aloop.c`; Debian builds `SND_ALOOP=m`, **UNVERIFIED** for the 7.2 backports config, to be checked first). Ship this as part of a **development system extension** (ADR opendap-os-0004 already reserves dev extensions), never in the release image.
+1. **Load the loopback** with enough substreams: `modprobe snd-aloop pcm_substreams=2` (module parameter name per `aloop.c`; Debian builds `SND_ALOOP=m`, **UNVERIFIED** for the 7.2 backports config, to be checked first). Ship this as part of a **development system extension** (ADR blackbird-os-0004 already reserves dev extensions), never in the release image.
 2. **Start capture first** at the expected format and rate. On `snd-aloop` the two ends are linked: once one end is open, the other must match its parameters. Opening capture first with the *expected* parameters turns a wrong engine choice into an `EINVAL` on the playback side, which is itself a useful assertion (behaviour from `aloop.c` constraints; **UNVERIFIED** in detail).
    - For per-track rate switching, the capture side must follow the playback side instead. The harness then opens capture *after* the engine opens playback, reads `hw_params` of the playback substream and opens capture with the same values.
 3. **Capture the raw bytes** with a small purpose-built tool (`dap-verify capture`, Rust + `alsa` crate), not `arecord`. `arecord` writes WAV headers and cannot write DSD containers cleanly (**UNVERIFIED** for alsa-utils 1.2.16), and a dedicated tool can snapshot `hw_params` at each rate change and record xruns.
@@ -152,7 +152,7 @@ Third-party "bit-perfect test files" exist (for example files whose decoded cont
 
 `snd-aloop` accepts any rate, so it cannot show what the engine does when the device **refuses** a rate, or when the 44.1k family is only available after an MCLK switch (BRD-023). Two options, in order of preference (recommendation):
 
-1. **An ALSA `ioplug` PCM plugin** (`libasound_module_pcm_opendap_fake.so`, in `opendap-os` dev repo) that enforces a **capability table** taken from the DAC datasheet and the board DT (allowed rates per MCLK, formats, DSD support yes/no), simulates the MCLK switch latency, and writes accepted samples to a file. The engine is pointed at it by device name in tests. It is user-space, so OS-002 (no custom kernel) is respected.
+1. **An ALSA `ioplug` PCM plugin** (`libasound_module_pcm_opendap_fake.so`, in `blackbird-os` dev repo) that enforces a **capability table** taken from the DAC datasheet and the board DT (allowed rates per MCLK, formats, DSD support yes/no), simulates the MCLK switch latency, and writes accepted samples to a file. The engine is pointed at it by device name in tests. It is user-space, so OS-002 (no custom kernel) is respected.
 2. **Opening `snd-aloop` capture first with a fixed rate** to force refusals (§3.2 step 2). Cheaper, but it can model only one rate at a time.
 
 Pass criteria added by the fake: the engine never asks for a rate outside the table; when the source rate is not supported, it **refuses or reports "not bit-perfect"** rather than resampling silently; when the family changes, it closes and reopens the PCM (observable as a new `hw_params`), and a configurable "settle" gap is respected.
@@ -213,7 +213,7 @@ A **USB audio interface** on its own cannot prove bit-perfection of an analog ou
 - **Analysis code first, verified on synthetic signals.** Write the THD+N, dynamic range, crosstalk and J-test analysers in Python (numpy/scipy) and test them on generated signals with *known* distortion (a 1 kHz tone plus a −100 dB 2nd harmonic must read −100 dB ± 0.5 dB). This makes the analysis itself verified before any hardware, and the same scripts are reused on the bench (gap analysis §2.7 recommends exactly this).
 - **ngspice** (47 on the dev host, with WAV read/write) models of the output stage: OPA1622 output impedance and load behaviour, balanced vs single-ended crosstalk through the shared ground of the TRRS/Pentaconn paths, the speaker amp's isolation from the DAC rails (BRD-012). Vendor models: TI's OPA1622 model availability in a form ngspice runs (not encrypted PSpice) is **UNVERIFIED**.
 - **Budget sheet** from datasheets (CS43198 DNR/THD+N, OPA1622 noise, resistor noise) with an estimated system result; marked "datasheet-derived".
-- **BRD-012 (speaker independent of DAC):** static check on the netlist (L0) that the speaker amplifier's input does not come from the DAC's analog outputs and has its own enable; L2 check that OpenDAP OS exposes the speaker as a separate ALSA PCM or a separate DAI link (with a fake DT under QEMU this is not reachable, so L2 is limited to the UCM/WirePlumber routing config being consistent).
+- **BRD-012 (speaker independent of DAC):** static check on the netlist (L0) that the speaker amplifier's input does not come from the DAC's analog outputs and has its own enable; L2 check that Blackbird OS exposes the speaker as a separate ALSA PCM or a separate DAI link (with a fake DT under QEMU this is not reachable, so L2 is limited to the UCM/WirePlumber routing config being consistent).
 
 ### Later (L3/L4)
 
@@ -294,10 +294,10 @@ Each block: **Pass** (what verified means) · **Now** (L0–L2) · **Later** (L3
 
 ### 5.9 P14 Peripheral hosting (OS-008, OS-015, BRD-004, BRD-005, BRD-014, BRD-015, HCS-013)
 
-- **Pass:** from OpenDAP OS alone, each programmable chip can be identified, flashed, verified, reset, debugged (halt, read registers/memory) and recovered after a failed flash; the RP2350's Try-Before-You-Buy fallback returns to the previous firmware when the new one does not confirm (lifecycle research finding 8); no helper MCU is in any data path (BRD-005).
+- **Pass:** from Blackbird OS alone, each programmable chip can be identified, flashed, verified, reset, debugged (halt, read registers/memory) and recovered after a failed flash; the RP2350's Try-Before-You-Buy fallback returns to the previous firmware when the new one does not confirm (lifecycle research finding 8); no helper MCU is in any data path (BRD-005).
 - **Now:**
   - **No emulator** (finding 7). **Stand-in:** a Pico 2 (RP2350) on the dev host plus a Pico running `debugprobe`. Tests: `picotool load` + `verify`, partition-table A/B, a deliberately non-confirming image to exercise TBYB fallback, SWD halt/flash with OpenOCD (pinned upstream commit with RP2350 and `linuxspidev`/gpiod support, lifecycle research finding 5). These run on macOS through `probe-rs`/`picotool`/`openocd` from the Brewfile; the **same scripts** later run on the T1 against the real coprocessor.
-  - **Firmware logic** (RP2350 orchestration code) unit-tested on the host, and its bus protocol with OpenDAP OS tested as a contract (golden message files).
+  - **Firmware logic** (RP2350 orchestration code) unit-tested on the host, and its bus protocol with Blackbird OS tested as a contract (golden message files).
   - **BRD-005** as an L0 netlist rule: no net of the audio, display, HAT high-speed or USB data paths has the RP2350 as a driver/receiver.
 - **Later:** L3 on a dev-kit SBC with the Pico wired to its GPIO/SPI (SoC-driven SWD as on the T1); L4 on the board. For HATs with FPGAs, openFPGALoader with a gpiod JTAG cable (lifecycle research finding 7).
 - **Tools:** existing: picotool, debugprobe, OpenOCD (pinned), probe-rs 0.32.0, openFPGALoader 1.2.0. Build: `opendap chip check` scenario runner (identify / flash / verify / rollback / debug).
@@ -305,11 +305,11 @@ Each block: **Pass** (what verified means) · **Now** (L0–L2) · **Later** (L3
 ### 5.10 P15 Faceplate HID command set (T1-018, T1-020, T1-023, T1-024, FPK-009, FPC-009, ADR t1-0002)
 
 - **Pass:** for each faceplate profile (touch, classic, cassette), the HID report descriptor parses in mainline `hid-input`; each usage in the core set produces exactly the Linux event the spec lists; vendor-page usages reach `hidraw` and not `input`; the vendor/product/version identify the faceplate; malformed descriptors and reports are rejected without crashing.
-- **Now (L2), to build: `faceplate-emu`** (Rust, `opendap-os` dev repo) on `/dev/uhid`:
+- **Now (L2), to build: `faceplate-emu`** (Rust, `blackbird-os` dev repo) on `/dev/uhid`:
   1. Generate the descriptor from the spec table (single source: a YAML of the core set in `t1/docs/specs/`, from which both the Markdown table and the golden descriptor are generated).
   2. `UHID_CREATE2` with `bus = BUS_I2C`, the faceplate's VID/PID/version, and the descriptor ([`uhid.h`](https://raw.githubusercontent.com/torvalds/linux/master/include/uapi/linux/uhid.h)).
   3. For every usage: send `UHID_INPUT2` press/release; read the resulting evdev events with `libevdev`; assert the event code from the spec. This turns the spec's "checked 2026-10-21 against `hid-input.c`" into a **regression test against the image's kernel**.
-  4. Vendor page: assert the report appears on `hidraw` and OpenDAP OS services decode it.
+  4. Vendor page: assert the report appears on `hidraw` and Blackbird OS services decode it.
   5. Fuzz: random descriptors and reports (cargo-fuzz on the host for the firmware encoder; in the guest, the kernel's own robustness is not OpenDAP's to test).
   - **hid-tools** 0.12 (2025-11-20, GPL-2.0-only) gives `hid-decode`, `hid-recorder`, `hid-replay` and a UHID-based kernel test suite ([PyPI](https://pypi.org/project/hid-tools/)); use `hid-decode` to review descriptors and `hid-replay` to replay recordings from real faceplates later.
   - **i2c-hid transport** (register map, reset, interrupt line, power during suspend) is not covered by UHID. Verify the faceplate firmware's HID-over-I2C implementation with host-side tests against the Microsoft HID-over-I2C protocol spec (**UNVERIFIED** current version/URL).
@@ -332,7 +332,7 @@ Each block: **Pass** (what verified means) · **Now** (L0–L2) · **Later** (L3
 #### P18 HAT EEPROM and signed manifest (HCS-007…011, HCS-017 Draft)
 
 - **Pass:** a valid EEPROM image is parsed (Raspberry Pi HAT+ format + OpenDAP record), the Ed25519 signature verifies, the manifest hash matches, the reverse-domain ID resolves through the package mechanism; every malformed case is rejected with a clear error: bad signature, wrong hash, truncated, wrong length fields, unknown key, oversize, replayed manifest from another ID.
-- **Now (L0/L2):** reference encoder/decoder + **test-vector corpus** in `hat-standard` (to build), fuzzed with cargo-fuzz; L2 in the virtual T1 by presenting the image to the verifier as an nvmem file (the `virt` machine has no I2C bus; the kernel `i2c-stub` module could stand in, **UNVERIFIED** in Debian config). Note ADR opendap-os-0005 trusts every HAT *for now*: the check must still **report** signature status even when policy accepts.
+- **Now (L0/L2):** reference encoder/decoder + **test-vector corpus** in `hat-standard` (to build), fuzzed with cargo-fuzz; L2 in the virtual T1 by presenting the image to the verifier as an nvmem file (the `virt` machine has no I2C bus; the kernel `i2c-stub` module could stand in, **UNVERIFIED** in Debian config). Note ADR blackbird-os-0005 trusts every HAT *for now*: the check must still **report** signature status even when policy accepts.
 - **Later:** real EEPROMs on HAT dev boards read by the SoC; Raspberry Pi's EEPROM utilities for cross-checking the HAT+ part (**UNVERIFIED** current tool names in `raspberrypi/utils`).
 
 ### 5.13 P19 Connectivity and storage (BRD-029, BRD-030, BRD-034, BRD-038, OS-022)
@@ -372,7 +372,7 @@ Each HAT repository owns a verification plan in the same format (§6.3). Example
 | Repository | Holds | Examples |
 |---|---|---|
 | `toolkit` | Host-side orchestration and analysers; the report schema; the traceability generator | `crates/opendap` verification commands; `crates/opendap-verify-model` (schema); `crates/opendap-testvectors`; `crates/opendap-audiocheck` (PCM comparator, `dop-check`, `dsd-native-check`, DSF/DFF reader); `crates/opendap-dose` reused from `system` or vice versa; Python analysis for THD+N/J-test under `tools/analysis/` with `uv` |
-| `opendap-os` | Guest-side helpers in the **development repository** (OS-015), the QEMU profiles and the fidelity path | `dap-verify` package (capture harness, `hw_params` snapshots, `faceplate-emu`, fixtures); dev system extension that loads `snd-aloop`; `build/dap-qemu.sh --fidelity` (U-Boot); scenario scripts for update/rollback |
+| `blackbird-os` | Guest-side helpers in the **development repository** (OS-015), the QEMU profiles and the fidelity path | `dap-verify` package (capture harness, `hw_params` snapshots, `faceplate-emu`, fixtures); dev system extension that loads `snd-aloop`; `build/dap-qemu.sh --fidelity` (U-Boot); scenario scripts for update/rollback |
 | `system` | Unit and contract tests of the services | Playback engine (exclusive ALSA, rate switching, bit-perfect flag), dose service, battery/thermal readers with fixtures |
 | `t1` | Product verification plan and matrix; faceplate interface source YAML and golden HID descriptors | `docs/verification/` (plan + generated status), `docs/specs/faceplate-interface.yaml` |
 | `board` | Simulations and bring-up tests | `sim/power/` model, `sim/audio/` ngspice, `sim/si/` openEMS/scikit-rf, `test/bringup/` checklists, netlist rules |
@@ -405,7 +405,7 @@ Initial check IDs: `audio.bitperfect.pcm`, `audio.bitperfect.dsd-native`, `audio
 ```json
 {"schema":"opendap.verification-result/v1",
  "check":"audio.bitperfect.dop","requirements":["OS-020","BRD-022"],
- "level":"L2","target":{"kind":"vm","name":"default","image":"opendap-os-qemu 2026.10.22+abc123"},
+ "level":"L2","target":{"kind":"vm","name":"default","image":"blackbird-os-qemu 2026.10.22+abc123"},
  "tools":{"opendap":"0.1.0","dop-check":"0.1.0","ffmpeg":"8.1.1","kernel":"7.2.9+deb13-arm64"},
  "inputs":[{"vector":"dsd-prbs-dsd64.dsf","sha256":"…"}],
  "observed":{"hw_params":{"format":"S24_3LE","rate":176400,"channels":2},
@@ -452,7 +452,7 @@ Initial check IDs: `audio.bitperfect.pcm`, `audio.bitperfect.dsd-native`, `audio
 
 1. **Audio test pads** on MCLK, BCLK, LRCK, SDATA (and DSD clock/data) of each DAC, reachable with the faceplate removed. Without them, bit-perfection below ALSA (§3.7) cannot be measured on the T1.
 2. **Current-measurement points:** a sense resistor or a removable link on the battery path and on each major rail (SoC, DDR, audio analog, display, radio, HAT), so BRD-008/T1-009 can be measured per block.
-3. **RP2350 SWD and BOOTSEL** exposed as pads (in addition to the SoC-driven SWD), so a bench probe can recover it independently of OpenDAP OS.
+3. **RP2350 SWD and BOOTSEL** exposed as pads (in addition to the SoC-driven SWD), so a bench probe can recover it independently of Blackbird OS.
 4. **Faceplate I2C + INT** and **HAT I2C (EEPROM)** reachable for a logic analyser.
 5. **HAT high-speed lanes:** keep a probe-friendly launch (or coupons on the panel) so a VNA/TDR can characterise board + flat cable separately from the pogo region.
 6. **A test-mode DT overlay** that exposes debug GPIOs (stage markers for boot-time measurement).
@@ -524,14 +524,14 @@ Legend: **Now** = software/simulation/static verification available before hardw
 | BRD-018, BRD-034 | Confirmed | USB-C OTG, flashing, host, charging… | L2 gadget roles with `dummy_hcd` (UNVERIFIED) | Each role on device; PD with Twinkie | E/B |
 | BRD-039 | Confirmed | Early console on the USB-C path | — (hardware path) | Console capture during boot | E |
 | BRD-019 | Confirmed | Boot without RP firmware | L0 no boot-critical dependency on coprocessor service | Boot with RP2350 held in reset | B |
-| OS-009, OS-016 | Confirmed | Run OpenDAP OS on host (QEMU), headless automation | `vm.self-test` | — | E: dap-qemu.sh |
+| OS-009, OS-016 | Confirmed | Run Blackbird OS on host (QEMU), headless automation | `vm.self-test` | — | E: dap-qemu.sh |
 | OS-018 | Confirmed | Virtual T1 mimics hardware | `vm.self-test` (display, touch, buttons, audio; battery/RP/HAT gaps listed) | Compare with device behaviour | B |
 | OS-019 | Confirmed | Remote control (desktop, SSH, screenshots, input) | QMP screenshot/press/tap round-trip tests | Same over USB/net on device | E: dap-qmp.py; B |
-| OS-008, HCS-013 | Confirmed | OpenDAP OS flashes/operates/debugs every chip | Pico 2 stand-in: load/verify/TBYB fallback/SWD | SoC-driven SWD on T1 and HATs | E: picotool, debugprobe, OpenOCD; B: chip check |
+| OS-008, HCS-013 | Confirmed | Blackbird OS flashes/operates/debugs every chip | Pico 2 stand-in: load/verify/TBYB fallback/SWD | SoC-driven SWD on T1 and HATs | E: picotool, debugprobe, OpenOCD; B: chip check |
 | OS-015 | Confirmed | Dev tools in a separate repo, tested on device | L2 install OpenOCD from dev repo, run `--version` and a self-test | Same on device | B |
 | BRD-004 | Confirmed | SoC reaches every chip directly | L0 netlist: every programmable chip's debug/boot pins reach SoC GPIO/bus | Flash each chip from SoC | B |
 | BRD-005 | Confirmed | Helper MCU never in a data path | L0 netlist rule | — | B |
-| BRD-014, BRD-015 | Confirmed | RP coprocessor, flashable from OpenDAP OS | Pico 2 stand-in | On board | E/B |
+| BRD-014, BRD-015 | Confirmed | RP coprocessor, flashable from Blackbird OS | Pico 2 stand-in | On board | E/B |
 | T1-023, T1-024, FPK-009, FPC-009 | Confirmed | Standardized binary commands (HID core + vendor page) | `faceplate-emu` over UHID: every usage → expected event; vendor page → hidraw | Real controller over `i2c-hid`; I2C capture | B: faceplate-emu; E: hid-tools 0.12 |
 | T1-020 | Confirmed | Identification by interface (HID VID/PID/version) | UHID test with each profile's IDs | Real faceplates | B |
 | T1-018 | Confirmed | Faceplate interface defined | L0 spec completeness check (pinout, dimensions, anchoring present) | — | B |
