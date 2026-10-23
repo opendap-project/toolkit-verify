@@ -28,7 +28,7 @@
 
 ## 1. Method
 
-1. Read every requirement README listed in the scope (board, t1, case, hat-standard, blackbird-os, system, toolkit, kicad-lib, ui-components, blender-lib, freecad-lib, faceplates/{touch,classic,cassette}, hats/{camera,nas,oscilloscope,powerbank,radio,recorder,vna}), every ADR (`board` 0001–0004, `t1` 0001–0002, `case` 0001–0003, `hat-standard` 0001, `blackbird-os` 0001–0005, `system` 0001) and the two specs.
+1. Read every requirement README listed in the scope (board, t1, case, hat-standard, blackbird-os, system, toolkit, kicad-lib, blackbird-ui, blender-lib, freecad-lib, faceplates/{touch,classic,cassette}, hats/{camera,nas,oscilloscope,powerbank,radio,recorder,vna}), every ADR (`board` 0001–0004, `t1` 0001–0002, `case` 0001–0003, `hat-standard` 0001, `blackbird-os` 0001–0005, `system` 0001) and the two specs.
 2. Kept only Confirmed and Draft rows. Grouped them into **24 verifiable promises** (§2).
 3. For each promise: defined pass criteria, a software verification now, a hardware measurement later, and the tools (existing vs to build).
 4. Checked the load-bearing facts (driver format tables, DoP/DSF layouts, UHID, QMP, test_power, U-Boot QEMU, RAUC, instruments) against primary sources.
@@ -353,7 +353,7 @@ Each block: **Pass** (what verified means) · **Now** (L0–L2) · **Later** (L3
 
 ### 5.16 P22 System software (SYS-001…011 Draft, DS-001)
 
-Architecture is not defined yet. **Recommendation:** each requirement becomes a contract test once the bus API exists: manifest schema validation for capabilities (SYS-002), activity lifecycle tests in L2 driven through QMP input and screenshots (SYS-006/007), package fetch only through the package endpoint (SYS-011: in L2, block direct egress with nftables and assert installs still work through the package endpoint and fail without it), and ui-components conformance by screenshot comparison against reference components (DS-001).
+Architecture is not defined yet. **Recommendation:** each requirement becomes a contract test once the bus API exists: manifest schema validation for capabilities (SYS-002), activity lifecycle tests in L2 driven through QMP input and screenshots (SYS-006/007), package fetch only through the package endpoint (SYS-011: in L2, block direct egress with nftables and assert installs still work through the package endpoint and fail without it), and blackbird-ui conformance by screenshot comparison against reference components (DS-001).
 
 ### 5.17 P23 Toolkit (TK-001…011, T1-025)
 
