@@ -4,7 +4,7 @@
 //! It creates a direct-touch multi-touch device through uinput, the size of the display in
 //! pixels, so a contact at (x, y) lands on that pixel. Unlike host-side injection (QEMU 11.1.2's
 //! virtio-multitouch passes no contact slot or tracking id from QMP), the contact goes through the
-//! same path as a real panel: evdev, libinput, `odap-shell`, the client.
+//! same path as a real panel: evdev, libinput, `odap-composer`, the client.
 //!
 //! Usage: odap-inject tap X Y [HOLD_MS]
 //!        odap-inject swipe X1 Y1 X2 Y2 [DURATION_MS]
